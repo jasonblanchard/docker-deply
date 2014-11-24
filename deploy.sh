@@ -34,6 +34,8 @@ case $1 in
   up)
     docker run -d --name=PHUSIONDOCKER_DB_1 ${DATABASE_IMAGE} && \
     docker run -d -p 8000:80 --link PHUSIONDOCKER_DB_1:PHUSIONDOCKER_DB_1 --name app_8000 ${APP_IMAGE}  && \
+    # Prevents a weird thing with running migrations
+    sleep 3 && \
     docker run -d -p 8001:80 --link PHUSIONDOCKER_DB_1:PHUSIONDOCKER_DB_1 --name app_8001 ${APP_IMAGE}  && \
     docker run -d -p 80:80 ${HAPROXY_IMAGE}
     ;;

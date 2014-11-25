@@ -32,6 +32,7 @@ run_app_containers_from_image () {
 
 case $1 in
   up)
+    docker pull ${TAGGED_IMAGE}
     docker run -d --name=PHUSIONDOCKER_DB_1 ${DATABASE_IMAGE} && \
     docker run -d -p 8000:80 --link PHUSIONDOCKER_DB_1:PHUSIONDOCKER_DB_1 --name app_8000 ${APP_IMAGE}  && \
     # Prevents a weird thing with running migrations

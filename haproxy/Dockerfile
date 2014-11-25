@@ -1,14 +1,14 @@
-from ubuntu:14.04
+FROM ubuntu:14.04
 
-run \
+RUN \
   apt-get update && \
   apt-get install -y haproxy && \
   rm -rf /var/lib/apt/lists/*
 
-add haproxy.cfg /etc/haproxy/haproxy.cfg
-run echo 'EXTRAOPTS="-db"' >>/etc/default/haproxy
+ADD haproxy.cfg /etc/haproxy/haproxy.cfg
+RUN echo 'EXTRAOPTS="-db"' >>/etc/default/haproxy
 
-cmd ["haproxy", "-f", "/etc/haproxy/haproxy.cfg", "-p", "-/var/run/haproxy.pid"]
+CMD ["haproxy", "-f", "/etc/haproxy/haproxy.cfg", "-p", "-/var/run/haproxy.pid"]
 
-expose 80
-expose 443
+EXPOSE 80
+EXPOSE 443

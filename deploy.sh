@@ -10,6 +10,17 @@ APP_CONTAINER="app"
 NUM_BACKUPS=2
 HAPROXY_IMAGE="jasonblanchard/haproxy"
 DATABASE_IMAGE="postgres"
+REDIS_IMAGE="redis"
+
+set_health () {
+  docker run -it \
+    --net host \
+    --rm=true \
+    nathanleclaire/curl \
+    curl --user super:secret "localhost:$1/health/$2" &>/dev/null || true
+
+  sleep 1
+}
 
 run_app_containers_from_image () {
   for i in {0..1}; do
@@ -17,28 +28,40 @@ run_app_containers_from_image () {
 
     echo "Updaing ${APP_CONTAINER}_800${i}"
 
+    # Deregister with HAProxy
+    set_health $PORT 'off'
+    # Let it finish services requests
+    sleep 5
+
     docker stop ${APP_CONTAINER}_800${i} &>/dev/null || true
     docker rm ${APP_CONTAINER}_800${i} &>/dev/null || true
 
     docker run -d \
       -p ${PORT}:80 \
       --link PHUSIONDOCKER_DB_1:PHUSIONDOCKER_DB_1 \
+      --link redis:redis \
+      -e LOCAL_PORT=${PORT} \
       --name ${APP_CONTAINER}_800${i} \
       $1
 
-    sleep 12
+    # Let the app come back online
+    sleep 10
+
+    # Re-register with HAProxy
+    set_health $PORT 'on'
   done
 }
 
 case $1 in
   up)
     docker pull ${TAGGED_IMAGE}
+    docker pull ${HAPROXY_IMAGE}
+
     docker run -d --name=PHUSIONDOCKER_DB_1 ${DATABASE_IMAGE} && \
-    docker run -d -p 8000:80 --link PHUSIONDOCKER_DB_1:PHUSIONDOCKER_DB_1 --name app_8000 ${APP_IMAGE}  && \
-    # Prevents a weird thing with running migrations
-    sleep 3 && \
-    docker run -d -p 8001:80 --link PHUSIONDOCKER_DB_1:PHUSIONDOCKER_DB_1 --name app_8001 ${APP_IMAGE}  && \
-    docker run -d -p 80:80 ${HAPROXY_IMAGE}
+    docker run -d --name=redis redis && \
+    run_app_containers_from_image ${TAGGED_IMAGE}
+
+    docker run --net host --name=haproxy -d -p 80:80 ${HAPROXY_IMAGE}
     ;;
 
   deploy)
@@ -46,6 +69,18 @@ case $1 in
     run_app_containers_from_image ${TAGGED_IMAGE}
     ;;
 
+  down)
+    docker stop app_8001
+    docker rm app_8001
+    docker stop app_8000
+    docker rm app_8000
+    docker stop PHUSIONDOCKER_DB_1
+    docker rm PHUSIONDOCKER_DB_1
+    docker stop haproxy
+    docker rm haproxy
+    docker stop redis
+    docker rm redis
+    ;;
   rollback)
     run_app_containers_from_image ${APP_IMAGE}:$2
     ;;
